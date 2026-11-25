@@ -1,48 +1,52 @@
 # LAVENDER_KERNEL
 
-Compatibility investigation for the Redmi Note 7 (lavender) running Lunaris AOSP 3.13 GMS-Official.
+Redmi Note 7 (**lavender**) kernel integration for the existing Lunaris AOSP 3.13 GMS-Official ROM. The ROM is not replaced.
 
-## Device/build target
+## Target captured from the phone
 
-| Item | Observed value |
+| Item | Value |
 |---|---|
-| Device | Xiaomi Redmi Note 7 / lavender |
-| RAM | 4 GB |
-| ROM | Lunaris AOSP 3.13 GMS-Official |
+| Device | Xiaomi Redmi Note 7 / `lavender` |
 | Android | 16 |
+| ROM | Lunaris AOSP 3.13 GMS-Official |
 | Security patch | 2026-11-01 |
-| Kernel | 4.19.325-cip136-st20-SouthWest-NG-0.23.0 |
-| Kernel build timestamp | 2026-11-23 19:35:43 UTC |
-| Current root state | Not rooted; `su` is absent |
-| Current Manager | KernelSU Next 3.4.2-spoofed |
+| Kernel | `4.19.325-cip136-st20-SouthWest-NG-0.23.0` |
+| Current state | KernelSU Manager is installed, but the running kernel has no KSU driver and `su` is absent |
 
-## Requested result
+## Integration plan now committed
 
-Keep the existing Lunaris GMS ROM and provide:
+- **Kernel base:** `pix106/android_kernel_xiaomi_sdm660_southwest-ng` at `cff390118b0803a60f332bf0f39ab0289bbb0195`.
+- **KernelSU Next:** legacy/manual-hook source at `0b17f24246db5c80c056b92c15bcad2b77f1276e`, with the 4.19 compatibility and SUSFS supercall patches from the pinned reference project. This is the v3.4.0-legacy driver line with UAPI 5, paired with the official v3.4.2 Manager. It is **not** the upstream v3.4.2 kernel driver; that driver has no equivalent verified manual-hook + SUSFS 2.3 integration for this non-GKI 4.19 target.
+- **SUSFS:** v2.3.0 NON-GKI, built into the kernel. It is not the GKI 5.10+ SUSFS guard LKM.
+- **NoMount:** v1.3.217 hookless/in-tree engine. Its kernel patch is applied before SUSFS because both touch `fs/proc/task_mmu.c`.
+- **Toolchain:** LineageOS clang-r416183b at `54220fd601050b350b2af7adc913089ebf0e7aed`.
 
-1. KernelSU Next (current 3.4.x manager line), built into the non-GKI 4.19 kernel.
-2. SUSFS support.
-3. NoMount support.
+The reference kernel that supplied the 4.19.325 manual-hook/SUSFS port is CIP135-ST19. The Lunaris kernel is CIP136-ST20. The build deliberately applies patches without fuzz and stops if any source hunk does not match. This source-port gate is essential; matching only the Linux version number is not proof of compatibility.
 
-## Current compatibility decision
+## Build
 
-**No flashable kernel is published by this repository yet.** The integration is intentionally blocked until the SUSFS implementation is proven against this exact 4.19.325 CIP kernel. A kernel image that only boots but does not actually load SUSFS is not considered a completed result.
+A pinned GitHub Actions build recipe is included:
 
-- KernelSU Next: the current project supports non-GKI kernels when its driver is built into the kernel. The 4.19 branch requires a legacy/in-tree integration; installing the Manager APK alone does not root the phone.
-- NoMount: the current NoMount Suite provides a hookless in-tree integration for Linux 4.19. Its kernel engine requires `CONFIG_NOMOUNT=y`, the integration patch and source files, plus the matching `00_NoMount-Module` metamodule.
-- SUSFS: the latest KernelSU Next SUSFS guard LKM is marked GKI-oriented and the official v3.4.2 release only publishes KMI-specific LKM assets for 5.10 and newer. The current 4.19 CIP kernel has no matching published KMI asset. The older upstream `kernel-4.19` SUSFS branch is v1.5.5 (last updated 2025-02-23); its KernelSU-side patch targets the older flat KernelSU layout and is not a drop-in patch for the current refactored KernelSU Next source.
+- Workflow: [Build Redmi Note 7 lavender kernel](.github/workflows/build-lavender.yml)
+- Script: [scripts/build_lavender.sh](scripts/build_lavender.sh)
+- Config: [configs/lavender-ksu-susfs-nomount.fragment](configs/lavender-ksu-susfs-nomount.fragment)
 
-See [the compatibility report](docs/compatibility.md) for exact source pins and the integration boundary.
+To run it, open the repository's **Actions** tab, choose **Build Redmi Note 7 lavender kernel**, then select **Run workflow**. The job first checks every pinned patch with `git apply --check`, merges SDM660 + lavender device configs, verifies the required Kconfig options, and only then compiles `Image-dtb`.
 
-## Kernel source baseline
+**Current build status: not yet compiled or boot-tested.** The workflow and reproducible build recipe are committed, but no Actions run/artifact is visible yet. The first CI run must pass before an image is treated as usable.
 
-- Source: [pix106/android_kernel_xiaomi_sdm660_southwest-ng](https://github.com/pix106/android_kernel_xiaomi_sdm660_southwest-ng)
-- Baseline commit: `cff390118b0803a60f332bf0f39ab0289bbb0195` (SouthWest-NG 0.23.0)
-- Lavender device config: `arch/arm64/configs/vendor/xiaomi/lavender.config`
-- Base defconfig: `arch/arm64/configs/vendor/xiaomi/sdm660_defconfig`
+## Expected post-build packages
 
-The observed base defconfig has `CONFIG_KPROBES` disabled and `CONFIG_MODULES` disabled. Both settings must be reconsidered explicitly for the requested KSU/SUSFS/NoMount configuration. No generic kernel ZIP should be flashed over the current ROM without a verified matching build and a tested recovery path.
+Install these only after a kernel with all three integrations has been successfully built and booted:
 
-## Safety
+1. KernelSU Next official v3.4.2 Manager (not a repackaged/spoofed Manager).
+2. SUSFS-for-KernelSU userspace helper, Revision 28: [sidex15 release](https://github.com/sidex15/susfs4ksu-module/releases/tag/v1.5.2%2B_R28).
+3. NoMount **in-tree** metamodule: [00_NoMount-Module v1.3.217](https://github.com/Bouteillepleine/NoMount-Suite/releases/download/v1.3.217/00_NoMount-Module-v1.3.217.zip). Do not use the LKM package for this 4.19 build.
 
-This repository currently contains compatibility notes only. It does not contain a boot image, flashable ZIP, or a completed kernel build. Do not flash a file merely because its filename contains `lavender`, `SouthWest-NG`, or `legacy`.
+NoMount's hookless in-tree engine provides path redirection, maps dev/inode rewriting and the xattr guard. It does **not** include every optional `_ghost` / `_pathhide` cloak available in the fuller forked kernels; do not expect `nomount check` to report those optional cloaks as available.
+
+## Safety / output boundary
+
+The pipeline produces `Image-dtb`, the final `.config`, and logs. It does not produce an AnyKernel ZIP or a boot image because the actual Lunaris `boot.img` header/ramdisk have not been supplied for a matching repack. Do not flash the kernel image as though it were a complete boot image. Back up the current boot image and verify a recovery path before any hardware test.
+
+Detailed rationale and exact pins: [docs/compatibility.md](docs/compatibility.md).
