@@ -119,6 +119,54 @@ git -C "$KERNEL" apply \
   "$WORK/patches/kernel2.patch"
 python3 "$ROOT/scripts/port_susfs_southwest.py" "$KERNEL"
 
+echo "=== Make Clang warning suppressions version-aware ==="
+python3 - "$KERNEL/Makefile" "$KERNEL/scripts/Makefile.extrawarn" <<'PY'
+from pathlib import Path
+import sys
+
+root_makefile = Path(sys.argv[1])
+extra_warn = Path(sys.argv[2])
+
+def replace_one(path: Path, old: str, new: str, label: str) -> None:
+    text = path.read_text()
+    count = text.count(old)
+    if count != 1:
+        raise SystemExit(f"{label}: expected one source line in {path}, found {count}")
+    path.write_text(text.replace(old, new, 1))
+
+# This tree already has a probed cc-disable-warning line later in the root Makefile.
+replace_one(
+    root_makefile,
+    "KBUILD_CFLAGS += -Wno-unused-but-set-variable\n",
+    "KBUILD_CFLAGS += $(call cc-disable-warning, unused-but-set-variable)\n",
+    "root Makefile unused-but-set-variable warning",
+)
+# Avoid passing LLVM-16-era / target-specific warning names unconditionally to Clang 12.
+replace_one(
+    extra_warn,
+    "KBUILD_CFLAGS += -Wno-unaligned-access\n",
+    "KBUILD_CFLAGS += $(call cc-disable-warning, unaligned-access)\n",
+    "unaligned-access warning",
+)
+replace_one(
+    extra_warn,
+    "KBUILD_CFLAGS += -Wno-cast-function-type-strict\n",
+    "KBUILD_CFLAGS += $(call cc-disable-warning, cast-function-type-strict)\n",
+    "cast-function-type-strict warning",
+)
+
+for path in (root_makefile, extra_warn):
+    content = path.read_text()
+    for unsupported in (
+        "-Wno-unused-but-set-variable",
+        "-Wno-unaligned-access",
+        "-Wno-cast-function-type-strict",
+    ):
+        if unsupported in content:
+            raise SystemExit(f"unconditional warning flag remains: {unsupported}")
+print("Clang warning options now use the kernel's compiler feature probe.")
+PY
+
 ln -sfn ../../ksu_next/kernel "$KERNEL/drivers/kernelsu"
 mkdir -p "$KERNEL/scripts/openssl-stub/openssl"
 cp "$WORK/patches/engine.h" "$KERNEL/scripts/openssl-stub/openssl/engine.h"
