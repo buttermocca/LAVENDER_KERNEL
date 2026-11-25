@@ -156,7 +156,16 @@ values = {}
 for key in required:
     enabled = f"{key}=y"
     disabled = f"# {key} is not set"
-    values[key] = "y" if enabled in config else "n" if disabled in config else "missing"
+    if enabled in config:
+        values[key] = "y"
+    elif disabled in config:
+        values[key] = "n"
+    elif key == "CONFIG_KPROBES":
+        # This 4.19 target tree does not emit CONFIG_KPROBES in .config.
+        # An absent Kconfig symbol is disabled; manual-hook mode is checked separately.
+        values[key] = "n"
+    else:
+        values[key] = "missing"
 
 print("=== Final required kernel configuration ===")
 for key, expected in required.items():
