@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "scripts/build_lavender.sh"
+      - "scripts/port_susfs_southwest.py"
       - "configs/lavender-ksu-susfs-nomount.fragment"
       - ".github/workflows/build-lavender.yml"
 permissions:
