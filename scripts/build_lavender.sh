@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
-ROOT="\${GITHUB_WORKSPACE:-$(pwd)}"
+ROOT="${GITHUB_WORKSPACE:-$(pwd)}"
 WORK="$ROOT/work"; KERNEL="$WORK/kernel"; KSU="$WORK/ksu_next"; OUT="$KERNEL/out"
 KERNEL_COMMIT="cff390118b0803a60f332bf0f39ab0289bbb0195"
 KSU_COMMIT="0b17f24246db5c80c056b92c15bcad2b77f1276e"
@@ -39,7 +39,7 @@ check_hash "$WORK/patches/ksu1.diff" "186f74f6e647f84b130e03e8bc36c9c952207038f7
 check_hash "$WORK/patches/ksu2.diff" "e7f19bfbf414b4cd94e795ecfbaa5f52a464468ecda0e2f3f112bc3dd38b0a80"
 check_hash "$WORK/patches/kernel1.patch" "987b02137a5ea4737b34202cf9c801da32873ba8a8962ead8df72b3c8365450e"
 check_hash "$WORK/patches/kernel2.patch" "4c146871a895af2f8b375ab88553bd81c4bb623461dcd44138c5402f152559bc"
-check_hash "$WORK/patches/engine.h" "de3d8eac3e193da0015b013e45eecc605faa9ec30c07c12b8c"
+check_hash "$WORK/patches/engine.h" "de3d8eac3e193da0015b013e45eecc605faa9ec30c07c12c8bccc7dec7272fcc"
 
 echo "=== KernelSU Next legacy manual-hook + SUSFS 2.3 integration ==="
 git -C "$KSU" apply --check "$WORK/patches/ksu1.diff"
@@ -74,11 +74,11 @@ cd "$KERNEL"
 ARGS=(ARCH=arm64 O=out CC=clang LLVM=1 LLVM_IAS=1 CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi-)
 
 echo "=== Configure SDM660 + lavender + KSU/SUSFS/NoMount ==="
-make "\${ARGS[@]}" vendor/xiaomi/sdm660_defconfig
+make "${ARGS[@]}" vendor/xiaomi/sdm660_defconfig
 "$KERNEL/scripts/kconfig/merge_config.sh" -m -O "$OUT" "$OUT/.config" \
   "$KERNEL/arch/arm64/configs/vendor/xiaomi/lavender.config" \
   "$ROOT/configs/lavender-ksu-susfs-nomount.fragment"
-make "\${ARGS[@]}" olddefconfig
+make "${ARGS[@]}" olddefconfig
 
 grep -q '^CONFIG_KSU=y$' "$OUT/.config"
 grep -q '^CONFIG_KSU_MANUAL_HOOK=y$' "$OUT/.config"
@@ -92,7 +92,7 @@ cp "$OUT/.config" "$ROOT/dist/kernel.config"
 grep -E '^(CONFIG_KSU=|CONFIG_KSU_MANUAL_HOOK=|CONFIG_KSU_SUSFS=|CONFIG_NOMOUNT=|CONFIG_MACH_XIAOMI_LAVENDER=|CONFIG_LOCALVERSION=)' "$OUT/.config" > "$ROOT/dist/config-summary.txt"
 
 echo "=== Compile Image-dtb ==="
-make "\${ARGS[@]}" -j2 Image-dtb
+make "${ARGS[@]}" -j2 Image-dtb
 IMAGE="$OUT/arch/arm64/boot/Image-dtb"
 test -s "$IMAGE"
 cp "$IMAGE" "$ROOT/dist/Image-dtb"

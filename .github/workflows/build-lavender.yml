@@ -9,9 +9,6 @@ on:
       - ".github/workflows/build-lavender.yml"
 permissions:
   contents: read
-concurrency:
-  group: lavender-kernel-\${{ github.ref }}
-  cancel-in-progress: true
 jobs:
   build:
     runs-on: ubuntu-24.04
