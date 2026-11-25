@@ -49,8 +49,50 @@ git -C "$KSU" apply "$WORK/patches/ksu2.diff"
 grep -q '^#define KERNEL_SU_UAPI_VERSION 5' "$KSU/uapi/supercall.h"
 
 echo "=== SouthWest-NG kernel manual-hook integration ==="
-git -C "$KERNEL" apply --check --exclude=arch/arm64/configs/grass-perf_defconfig "$WORK/patches/kernel1.patch"
-git -C "$KERNEL" apply --exclude=arch/arm64/configs/grass-perf_defconfig "$WORK/patches/kernel1.patch"
+# The reference patch targets an OPlus/OnePlus-flavoured 4.19 tree. This
+# SDM660 tree has no drivers/gud/Kconfig tail and no __diagnose_as block.
+# Keep the functional call-site changes, and wire the KSU directory at this
+# tree's actual generic endmenu/Makefile locations.
+git -C "$KERNEL" apply --check \
+  --exclude=arch/arm64/configs/grass-perf_defconfig \
+  --exclude=drivers/Kconfig \
+  --exclude=drivers/Makefile \
+  --exclude=include/linux/compiler-clang.h \
+  "$WORK/patches/kernel1.patch"
+git -C "$KERNEL" apply \
+  --exclude=arch/arm64/configs/grass-perf_defconfig \
+  --exclude=drivers/Kconfig \
+  --exclude=drivers/Makefile \
+  --exclude=include/linux/compiler-clang.h \
+  "$WORK/patches/kernel1.patch"
+
+python3 - "$KERNEL/drivers/Kconfig" "$KERNEL/drivers/Makefile" <<'PY'
+from pathlib import Path
+import sys
+
+kconfig = Path(sys.argv[1])
+makefile = Path(sys.argv[2])
+k = kconfig.read_text()
+m = makefile.read_text()
+
+source = 'source "drivers/kernelsu/Kconfig"'
+obj = 'obj-$(CONFIG_KSU) += kernelsu/'
+
+if source not in k:
+    pos = k.rfind("endmenu")
+    if pos < 0:
+        raise SystemExit("drivers/Kconfig has no final endmenu")
+    k = k[:pos] + source + "\\n" + k[pos:]
+
+if obj not in m:
+    m = m.rstrip() + "\\n" + obj + "\\n"
+
+kconfig.write_text(k)
+makefile.write_text(m)
+PY
+
+grep -q 'source "drivers/kernelsu/Kconfig"' "$KERNEL/drivers/Kconfig"
+grep -Fq 'obj-$(CONFIG_KSU) += kernelsu/' "$KERNEL/drivers/Makefile"
 
 echo "=== NoMount v1.3.217 integration BEFORE SUSFS ==="
 sed -n '/^diff --git /,$p' "$WORK/patches/nomount.patch" > "$WORK/patches/nomount-clean.patch"
