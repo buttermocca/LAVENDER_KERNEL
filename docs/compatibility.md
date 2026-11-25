@@ -90,14 +90,12 @@ Any context mismatch is a hard stop. A mismatch requires a reviewed port to the 
 
 ## 7. Current execution status
 
-The repository now contains:
-- `scripts/build_lavender.sh`
-- `.github/workflows/build-lavender.yml`
-- `configs/lavender-ksu-susfs-nomount.fragment`
+Initial CI runs `#1` and `#2` both failed during the manual-hook kernel patch application, before Kconfig generation or C compilation. The exact mismatched hunks were:
+- `drivers/Kconfig`: the reference patch anchors to `drivers/gud/Kconfig`, which is absent in SouthWest-NG.
+- `drivers/Makefile`: the reference patch anchors to a OnePlus/OPlus driver tail not present in this SDM660 tree.
+- `include/linux/compiler-clang.h`: the reference patch expects a newer `__diagnose_as` block which this tree does not contain; the reference/KSU source search did not find a caller requiring it.
 
-The workflow creates a kernel-image artifact and build evidence only. It deliberately does not pack a flashable ZIP or boot image: the exact Lunaris boot image header and ramdisk have not been provided.
-
-**No successful compile, patch-application run, boot test, or runtime SUSFS/NoMount test is recorded yet.** The initial GitHub Actions run list is empty. The workflow must be started from the repository's Actions tab (workflow: *Build Redmi Note 7 lavender kernel*) and must pass before an image is treated as usable.
+The build script was changed to apply the remaining manual-hook call-site hunks without fuzz, then add the KSU Kconfig source at this tree's actual final `endmenu` and the KSU Makefile object at the actual end of `drivers/Makefile`. The unused clang-attribute hunk is skipped rather than inserted into a file whose source layout does not contain it. The follow-up CI runs are now checking that adaptation and the subsequent NoMount/SUSFS patches.
 
 ## 8. Post-build modules
 
