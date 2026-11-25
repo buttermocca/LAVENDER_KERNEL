@@ -31,6 +31,7 @@ jobs:
           chmod +x scripts/build_lavender.sh
           scripts/build_lavender.sh
       - name: Upload kernel and build evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: lavender-southwest-ng-ksu-susfs-nomount
@@ -41,7 +42,7 @@ jobs:
             dist/SHA256SUMS
             dist/build-manifest.txt
             logs/build.log
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 14
 
 # CI trigger refresh: pinned Lavender build recipe.
