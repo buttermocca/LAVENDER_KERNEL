@@ -82,10 +82,10 @@ if source not in k:
     pos = k.rfind("endmenu")
     if pos < 0:
         raise SystemExit("drivers/Kconfig has no final endmenu")
-    k = k[:pos] + source + "\\n" + k[pos:]
+    k = k[:pos] + source + "\n" + k[pos:]
 
 if obj not in m:
-    m = m.rstrip() + "\\n" + obj + "\\n"
+    m = m.rstrip() + "\n" + obj + "\n"
 
 kconfig.write_text(k)
 makefile.write_text(m)
