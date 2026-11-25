@@ -135,15 +135,40 @@ make "${ARGS[@]}" vendor/xiaomi/sdm660_defconfig
   "$ROOT/configs/lavender-ksu-susfs-nomount.fragment"
 make "${ARGS[@]}" olddefconfig
 
-grep -q '^CONFIG_KSU=y$' "$OUT/.config"
-grep -q '^CONFIG_KSU_MANUAL_HOOK=y$' "$OUT/.config"
-grep -q '^# CONFIG_KPROBES is not set$' "$OUT/.config"
-grep -q '^CONFIG_KSU_SUSFS=y$' "$OUT/.config"
-grep -q '^CONFIG_NOMOUNT=y$' "$OUT/.config"
-grep -q '^CONFIG_MACH_XIAOMI_LAVENDER=y$' "$OUT/.config"
-grep -q '^CONFIG_BUILD_ARM64_APPENDED_DTB_IMAGE=y$' "$OUT/.config"
-
+# Preserve the generated config even if one required option was dropped by Kconfig.
 cp "$OUT/.config" "$ROOT/dist/kernel.config"
+python3 - "$OUT/.config" <<'PY'
+from pathlib import Path
+import sys
+
+config = Path(sys.argv[1]).read_text().splitlines()
+required = {
+    "CONFIG_KSU": "y",
+    "CONFIG_KSU_MANUAL_HOOK": "y",
+    "CONFIG_KPROBES": "n",
+    "CONFIG_KSU_SUSFS": "y",
+    "CONFIG_NOMOUNT": "y",
+    "CONFIG_MACH_XIAOMI_LAVENDER": "y",
+    "CONFIG_BUILD_ARM64_APPENDED_DTB_IMAGE": "y",
+}
+
+values = {}
+for key in required:
+    enabled = f"{key}=y"
+    disabled = f"# {key} is not set"
+    values[key] = "y" if enabled in config else "n" if disabled in config else "missing"
+
+print("=== Final required kernel configuration ===")
+for key, expected in required.items():
+    actual = values[key]
+    result = "OK" if actual == expected else f"FAIL (expected {expected}, got {actual})"
+    print(f"{key}: {actual} [{result}]")
+
+failed = [key for key, expected in required.items() if values[key] != expected]
+if failed:
+    print("Configuration validation failed for: " + ", ".join(failed))
+    raise SystemExit(1)
+PY
 grep -E '^(CONFIG_KSU=|CONFIG_KSU_MANUAL_HOOK=|CONFIG_KSU_SUSFS=|CONFIG_NOMOUNT=|CONFIG_MACH_XIAOMI_LAVENDER=|CONFIG_LOCALVERSION=)' "$OUT/.config" > "$ROOT/dist/config-summary.txt"
 
 echo "=== Compile Image-dtb ==="
