@@ -25,6 +25,28 @@ def replace_once(relpath: str, old: str, new: str, description: str) -> None:
         )
     path.write_text(content.replace(old, new, 1))
 
+
+def replace_once_in_region(relpath: str, start_marker: str, end_marker: str,
+                           old: str, new: str, description: str) -> None:
+    path = root / relpath
+    content = path.read_text()
+    start = content.find(start_marker)
+    if start < 0:
+        raise SystemExit(f"{description}: start marker missing in {relpath}")
+    end = content.find(end_marker, start + len(start_marker))
+    if end < 0:
+        raise SystemExit(f"{description}: end marker missing in {relpath}")
+    region = content[start:end]
+    if new in region:
+        return
+    count = region.count(old)
+    if count != 1:
+        raise SystemExit(
+            f"{description}: expected one anchor inside selected function in {relpath}, found {count}"
+        )
+    region = region.replace(old, new, 1)
+    path.write_text(content[:start] + region + content[end:])
+
 # fs/Makefile: this tree's filesystem object list has extra fs_types.o.
 replace_once(
     "fs/Makefile",
@@ -217,18 +239,20 @@ replace_once(
     "SYSCALL_DEFINE1(newuname, struct new_utsname __user *, name)\n",
     "SUSFS uname declarations",
 )
-replace_once(
+replace_once_in_region(
     "kernel/sys.c",
-    "\tdown_read(&uts_sem);\n"
-    "\tmemcpy(&tmp, utsname(), sizeof(tmp));\n"
-    "\tup_read(&uts_sem);\n",
-    "\tdown_read(&uts_sem);\n"
-    "\tmemcpy(&tmp, utsname(), sizeof(tmp));\n"
-    "#ifdef CONFIG_KSU_SUSFS_SPOOF_UNAME\n"
-    "\tif (static_branch_likely(&susfs_is_uname_spoof_buffer_set))\n"
-    "\t\tsusfs_spoof_uname(&tmp);\n"
-    "#endif\n"
-    "\tup_read(&uts_sem);\n",
+    "SYSCALL_DEFINE1(newuname, struct new_utsname __user *, name)\\n{",
+    "\\n#ifdef __ARCH_WANT_SYS_OLD_UNAME",
+    "\\tdown_read(&uts_sem);\\n"
+    "\\tmemcpy(&tmp, utsname(), sizeof(tmp));\\n"
+    "\\tup_read(&uts_sem);\\n",
+    "\\tdown_read(&uts_sem);\\n"
+    "\\tmemcpy(&tmp, utsname(), sizeof(tmp));\\n"
+    "#ifdef CONFIG_KSU_SUSFS_SPOOF_UNAME\\n"
+    "\\tif (static_branch_likely(&susfs_is_uname_spoof_buffer_set))\\n"
+    "\\t\\tsusfs_spoof_uname(&tmp);\\n"
+    "#endif\\n"
+    "\\tup_read(&uts_sem);\\n",
     "SUSFS uname spoof call",
 )
 
