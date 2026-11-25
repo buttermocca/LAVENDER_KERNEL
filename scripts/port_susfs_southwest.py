@@ -241,18 +241,18 @@ replace_once(
 )
 replace_once_in_region(
     "kernel/sys.c",
-    "SYSCALL_DEFINE1(newuname, struct new_utsname __user *, name)\\n{",
-    "\\n#ifdef __ARCH_WANT_SYS_OLD_UNAME",
-    "\\tdown_read(&uts_sem);\\n"
-    "\\tmemcpy(&tmp, utsname(), sizeof(tmp));\\n"
-    "\\tup_read(&uts_sem);\\n",
-    "\\tdown_read(&uts_sem);\\n"
-    "\\tmemcpy(&tmp, utsname(), sizeof(tmp));\\n"
-    "#ifdef CONFIG_KSU_SUSFS_SPOOF_UNAME\\n"
-    "\\tif (static_branch_likely(&susfs_is_uname_spoof_buffer_set))\\n"
-    "\\t\\tsusfs_spoof_uname(&tmp);\\n"
-    "#endif\\n"
-    "\\tup_read(&uts_sem);\\n",
+    "SYSCALL_DEFINE1(newuname, struct new_utsname __user *, name)\n{",
+    "\n#ifdef __ARCH_WANT_SYS_OLD_UNAME",
+    "\tdown_read(&uts_sem);\n"
+    "\tmemcpy(&tmp, utsname(), sizeof(tmp));\n"
+    "\tup_read(&uts_sem);\n",
+    "\tdown_read(&uts_sem);\n"
+    "\tmemcpy(&tmp, utsname(), sizeof(tmp));\n"
+    "#ifdef CONFIG_KSU_SUSFS_SPOOF_UNAME\n"
+    "\tif (static_branch_likely(&susfs_is_uname_spoof_buffer_set))\n"
+    "\t\tsusfs_spoof_uname(&tmp);\n"
+    "#endif\n"
+    "\tup_read(&uts_sem);\n",
     "SUSFS uname spoof call",
 )
 
