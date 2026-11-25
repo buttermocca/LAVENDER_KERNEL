@@ -103,8 +103,21 @@ fetch "$NMS/hookless/src/nomount.c" "$KERNEL/fs/nomount.c"
 fetch "$NMS/hookless/src/nomount.h" "$KERNEL/fs/nomount.h"
 
 echo "=== SUSFS 2.3.0 NON-GKI kernel integration AFTER NoMount ==="
-git -C "$KERNEL" apply --check --exclude=arch/arm64/configs/grass-perf_defconfig "$WORK/patches/kernel2.patch"
-git -C "$KERNEL" apply --exclude=arch/arm64/configs/grass-perf_defconfig "$WORK/patches/kernel2.patch"
+git -C "$KERNEL" apply --check \
+  --exclude=arch/arm64/configs/grass-perf_defconfig \
+  --exclude=fs/Makefile \
+  --exclude=fs/proc/cmdline.c \
+  --exclude=fs/proc/task_mmu.c \
+  --exclude=kernel/sys.c \
+  "$WORK/patches/kernel2.patch"
+git -C "$KERNEL" apply \
+  --exclude=arch/arm64/configs/grass-perf_defconfig \
+  --exclude=fs/Makefile \
+  --exclude=fs/proc/cmdline.c \
+  --exclude=fs/proc/task_mmu.c \
+  --exclude=kernel/sys.c \
+  "$WORK/patches/kernel2.patch"
+python3 "$ROOT/scripts/port_susfs_southwest.py" "$KERNEL"
 
 ln -sfn ../../ksu_next/kernel "$KERNEL/drivers/kernelsu"
 mkdir -p "$KERNEL/scripts/openssl-stub/openssl"
