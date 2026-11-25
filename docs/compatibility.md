@@ -1,103 +1,114 @@
-# Compatibility report: Lunaris 3.13 GMS / lavender / Linux 4.19.325
+# Compatibility and integration record
 
-Investigation date: 2026-11-26.
+Investigation date: 2026-11-26. This document records source-derived facts separately from build/runtime status.
 
-## 1. Exact target recorded from the supplied Android Version screen
+## 1. Exact device target
 
-- Device: Xiaomi Redmi Note 7 | `lavender`
-- Android: 16
-- ROM package type: `GMS-OFFICIAL`
-- ROM: Lunaris AOSP 3.13 GMS-Official
-- Android security patch: 2026-11-01
-- Baseband: `3.1-00777-SDM660_GEN_PACK-1.381998.1.399979.1`
-- Kernel: `4.19.325-cip136-st20-SouthWest-NG-0.23.0`
-- Kernel build: `#1 Mon Nov 23 19:35:43 UTC 2026`
+| Item | Value |
+|---|---|
+| Device | Xiaomi Redmi Note 7 / `lavender` |
+| Android | 16 |
+| ROM | Lunaris AOSP 3.13 GMS-Official |
+| Security patch | 2026-11-01 |
+| Baseband | `3.1-00777-SDM660_GEN_PACK-1.381998.1.399979.1` |
+| Running kernel | `4.19.325-cip136-st20-SouthWest-NG-0.23.0` |
+| Running root state | `su` was absent; Manager installation alone had not enabled root |
 
-ADB checks supplied by the owner show:
+## 2. Source pins
 
-```text
-adb shell su -c id
-/system/bin/sh: su: inaccessible or not found
-
-adb shell uname -r
-4.19.325-cip136-st20-SouthWest-NG-0.23.0
-```
-
-The installed KernelSU Next Manager v3.4.2-spoofed reports that the non-GKI kernel has no KernelSU Next driver integrated. The APK is only the manager; it does not install the required in-kernel driver.
-
-## 2. Source pins inspected
-
-| Component | Source / pin | Finding |
+| Component | Pin | Purpose |
 |---|---|---|
-| SouthWest-NG kernel | `pix106/android_kernel_xiaomi_sdm660_southwest-ng` / `cff390118b0803a60f332bf0f39ab0289bbb0195` | Exact 0.23.0 generation; contains lavender config and SDM660 base defconfig |
-| KernelSU Next | `KernelSU-Next/KernelSU-Next` current `dev` snapshot inspected at `3660779ea2e2fe1adb27616d8aad9ffaad717501` | Current driver code; non-GKI 4.19 requires the driver built into the kernel |
-| KernelSU Next release | `v3.4.2` | Official release published 2026-10-13; its downloadable SUSFS guard LKM assets are KMI-specific GKI assets |
-| NoMount Suite | `Bouteillepleine/NoMount-Suite` latest release inspected: `v1.3.217` | Built-in / hookless integration supports Linux 4.19; LKM zip is for GKI 5.10–6.18 |
-| SUSFS upstream 4.19 | `simonpunk/susfs4ksu`, `kernel-4.19`, commit `001e69919c6271f690fd00b17e4c721c9e599152` | SUSFS v1.5.5, last update 2025-02-23 |
+| SouthWest-NG kernel | `pix106/android_kernel_xiaomi_sdm660_southwest-ng` @ `cff390118b0803a60f332bf0f39ab0289bbb0195` | Exact 0.23.0 source base |
+| KernelSU Next driver | `KernelSU-Next/KernelSU-Next` @ `0b17f24246db5c80c056b92c15bcad2b77f1276e` | Non-GKI 4.19 legacy/manual-hook driver base |
+| KSU 4.19 compatibility + SUSFS integration | `6078HITHEDAY/tb128fu-kernelsu-next-reference` @ `54dbc5ac847872d16fb268cb4072bd37d9ee7d5c` | Pinned known-good patch set |
+| NoMount Suite | `Bouteillepleine/NoMount-Suite` v1.3.217 @ `66f4452ae4fdde2df162af32c38bdb1bd8ebfafd` | 4.19 in-tree hookless engine |
+| Clang toolchain | `LineageOS/android_prebuilts_clang_kernel_linux-x86_clang-r416183b` @ `54220fd601050b350b2af7adc913089ebf0e7aed` | Reproducible compiler |
 
-## 3. KernelSU Next: feasible on this kernel
+## 3. KernelSU Next integration choice
 
-KernelSU Next's published compatibility notes state that 4.19–5.4 requires the driver built into the kernel. The current upstream has a `legacy` integration path and a syscall-table hook option for ARM64 kernels >=4.17. Therefore a built-in KernelSU Next driver is a feasible route for this 4.19.325 ARM64 kernel.
+The selected source is the KernelSU Next **legacy/manual-hook** line, not the upstream v3.4.2 kernel driver tree. The reference project pins commit `0b17f242`, adds a manual sucompat entry and retries a userspace filename read in process context, then integrates SUSFS v2.3.0 into the legacy supercall path.
 
-The actual defconfig still needs deliberate integration. In the SouthWest-NG source, the base `sdm660_defconfig` has `CONFIG_KPROBES` disabled and `CONFIG_MODULES` disabled. The correct hook mode and all required kernel options must be selected before building; do not simply flash the Manager APK again.
+The selected integration reports UAPI version 5 to match the released official v3.4.2 Manager. It uses:
+- `CONFIG_KSU=y`
+- `CONFIG_KSU_MANUAL_HOOK=y`
+- `CONFIG_KPROBES=n`
+- no syscall-table hook
+- explicit call-site hooks in the 4.19 source tree
 
-References:
-- https://github.com/KernelSU-Next/KernelSU-Next
-- https://github.com/KernelSU-Next/KernelSU-Next/tree/legacy
+The upstream v3.4.2 KSU kernel release uses a different source organization and its official prebuilt kernel/SUSFS LKM assets are GKI/KMI variants for Android 5.10 and newer. Those binaries must not be renamed or loaded on this 4.19 CIP kernel.
+
+**Version distinction:** the Manager is v3.4.2; the kernel driver is based on the v3.4.0-legacy source snapshot at the pinned commit above, with compatibility patches. This is the tested compatibility choice, not a claim that the v3.4.2 upstream kernel driver has been ported.
+
+Sources:
 - https://github.com/KernelSU-Next/KernelSU-Next/releases/tag/v3.4.2
+- https://github.com/6078HITHEDAY/tb128fu-kernelsu-next-reference
 
-## 4. NoMount: a 4.19 in-tree integration exists
+## 4. SUSFS v2.3.0 NON-GKI
 
-The NoMount Suite's `hookless` integration explicitly lists Linux 4.19. It requires:
-- the 4.19-compatible `nomount_kernel_integration.patch`,
-- `hookless/src/nomount.c` and `hookless/src/nomount.h` copied into `fs/`,
+The selected reference integrates SUSFS v2.3.0 directly into the non-GKI kernel and wires its command handling through KernelSU Next's legacy supercall path. This differs from the current official KernelSU Next SUSFS guard LKM, whose downloadable assets are GKI KMI-specific for 5.10 and newer.
+
+The user-space helper is separate from the kernel implementation. The current sidex15 module release is Revision 28 (`v1.5.2+_R28`), which communicates with patched SUSFS kernels; install it only after the matching patched kernel has booted.
+
+Sources:
+- https://github.com/KernelSU-Next/KernelSU-Next/releases/tag/v3.4.2
+- https://github.com/sidex15/susfs4ksu-module/releases/tag/v1.5.2%2B_R28
+- https://github.com/6078HITHEDAY/tb128fu-kernelsu-next-reference/blob/main/docs/pitfalls.md
+
+## 5. NoMount v1.3.217
+
+The selected NoMount path is the hookless/in-tree engine, not the LKM variant. The NoMount integration patch is supported by its project for Linux 4.19, and requires:
+- its kernel integration patch,
+- `hookless/src/nomount.c` and `nomount.h` copied into `fs/`,
 - `CONFIG_NOMOUNT=y`,
-- and the matching `00_NoMount-Module` metamodule installed from the KernelSU Next manager.
+- the matching `00_NoMount-Module` metamodule after the kernel is installed.
 
-The `01_NoMount-Module-LKM` package is not for this 4.19 kernel; the project documents that LKM package for GKI 5.10–6.18.
+The NoMount integration is applied **before** the SUSFS patch because both modify `fs/proc/task_mmu.c`. The build uses the exact NoMount v1.3.217 tag commit above.
 
-There is a scope caveat: the documented `hookless` integration does not implement every optional cloak/path-hide call-site feature that exists in the fuller in-tree forks. It is not accurate to call that subset a fully verified implementation of every NoMount hiding feature. Kernel patch application and runtime behavior still need testing on the exact SouthWest-NG tree.
+Scope limitation: this hookless integration provides path redirection, maps dev/inode rewriting and the xattr guard. It does not include all optional `_ghost` / `_pathhide` call-site cloaks present in the fuller forks. The build must not advertise those optional cloaks as enabled.
 
-References:
-- https://github.com/Bouteillepleine/NoMount-Suite
+Sources:
+- https://github.com/Bouteillepleine/NoMount-Suite/releases/tag/v1.3.217
 - https://github.com/Bouteillepleine/NoMount-Suite/tree/main/hookless
 
-## 5. SUSFS: this is the blocking compatibility issue
+## 6. Adaptation to SouthWest-NG CIP136-ST20
 
-There are two different SUSFS paths; neither currently gives a verified drop-in solution for this exact kernel plus the latest KernelSU Next:
+The reference patch set was validated against a different Linux 4.19.325 CIP135-ST19 tree. Lunaris currently runs SouthWest-NG 0.23.0, CIP136-ST20. Linux version equivalence alone does not prove source compatibility.
 
-### 5.1 Current KernelSU Next SUSFS guard LKM
+The committed build script therefore:
+1. checks out the exact SouthWest-NG commit,
+2. checks out pinned KSU Next, NoMount and clang commits,
+3. verifies the four reference patch SHA-256 values,
+4. applies KSU patches with `git apply --check`,
+5. applies the manual-hook, NoMount, and SUSFS kernel patches in that order with no fuzz,
+6. merges the original SDM660 base config, lavender device config and feature fragment,
+7. asserts KSU manual-hook, SUSFS, NoMount and lavender options are enabled,
+8. builds `Image-dtb`.
 
-The current KernelSU Next release publishes SUSFS guard modules by GKI KMI name (for example `android16-6.12_susfs_guard_lkm.ko`). Its userspace `ksud susfs load` selects an embedded module asset by KMI. There is no official `4.19.325-cip136-st20-SouthWest-NG-0.23.0` asset.
+The manual-hook patch's reference-only `grass-perf_defconfig` hunk is excluded; the actual target uses `vendor/xiaomi/sdm660_defconfig` plus `vendor/xiaomi/lavender.config`.
 
-The current source labels this LKM `2.3.0-gki`. Its BTF-layout code resolves `btf_vmlinux` and BTF type functions. This makes it a GKI-oriented path, not a known-compatible 4.19 CIP module. Reusing a random GKI `.ko` or only renaming its KMI asset would be unsafe.
+Any context mismatch is a hard stop. A mismatch requires a reviewed port to the CIP136-ST20 files; it must not be bypassed with fuzz or by deleting failing hunks.
 
-Reference:
-- https://github.com/KernelSU-Next/KernelSU-Next/blob/dev/kernel/susfs/susfs_core.h
-- https://github.com/KernelSU-Next/KernelSU-Next/blob/dev/kernel/susfs/btf_layout.c
+## 7. Current execution status
+
+The repository now contains:
+- `scripts/build_lavender.sh`
+- `.github/workflows/build-lavender.yml`
+- `configs/lavender-ksu-susfs-nomount.fragment`
+
+The workflow creates a kernel-image artifact and build evidence only. It deliberately does not pack a flashable ZIP or boot image: the exact Lunaris boot image header and ramdisk have not been provided.
+
+**No successful compile, patch-application run, boot test, or runtime SUSFS/NoMount test is recorded yet.** The initial GitHub Actions run list is empty. The workflow must be started from the repository's Actions tab (workflow: *Build Redmi Note 7 lavender kernel*) and must pass before an image is treated as usable.
+
+## 8. Post-build modules
+
+After the new kernel boots and KernelSU Next reports Working, install:
+- official KernelSU Next v3.4.2 Manager, not a repackaged Manager,
+- SUSFS-for-KernelSU Revision 28 user-space module,
+- NoMount `00_NoMount-Module-v1.3.217.zip`.
+
+Do not install `01_NoMount-Module-LKM`; it is intended for stock GKI 5.10–6.18, not this in-tree 4.19 build.
+
+Links:
 - https://github.com/KernelSU-Next/KernelSU-Next/releases/tag/v3.4.2
-
-### 5.2 Upstream non-GKI SUSFS 4.19 patch
-
-The available upstream `kernel-4.19` branch is SUSFS v1.5.5, commit `001e6991`, dated 2025-02-23. Its KernelSU-side integration patch was written for the older flat KernelSU source layout. Current KernelSU Next is substantially refactored. A build script that blindly applies that old patch to current KernelSU Next should be expected to fail or require a real port.
-
-A community KernelSU build guide explicitly notes that non-GKI SUSFS branches have not been updated since early 2025 and their KernelSU-side patch can fail against restructured forks.
-
-References:
-- https://gitlab.com/simonpunk/susfs4ksu/-/tree/kernel-4.19
-- https://github.com/Albanel22/xiaoleGun-KernelSU_Action
-
-## 6. Why this repository does not publish a kernel image yet
-
-The kernel source and device config are known, but a complete source-level integration has not been demonstrated for:
-
-```text
-KernelSU Next v3.4.x
-+ SUSFS (a 4.19-compatible implementation)
-+ NoMount
-+ SouthWest-NG 0.23.0 / lavender
-```
-
-A KSU Next + NoMount kernel without working SUSFS would not meet the owner's request. Likewise, an old SUSFS patch that merely applies with fuzz, a GKI-only SUSFS module renamed to look like a 4.19 module, or an image that has not been built and boot-tested must not be advertised as a completed kernel.
-
-No boot image, flashable ZIP, or prebuilt binary has been generated by this repository at this stage. The next engineering milestone is to port and compile-test a SUSFS implementation against the exact 4.19.325 SouthWest-NG source while preserving the current Lunaris GMS userspace, then run the full kernel build and static artifact checks. Only after those gates pass should a reversible boot test be prepared.
+- https://github.com/sidex15/susfs4ksu-module/releases/tag/v1.5.2%2B_R28
+- https://github.com/Bouteillepleine/NoMount-Suite/releases/download/v1.3.217/00_NoMount-Module-v1.3.217.zip
