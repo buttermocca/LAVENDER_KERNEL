@@ -1,0 +1,47 @@
+name: Build Redmi Note 7 lavender kernel
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/build_lavender.sh"
+      - "configs/lavender-ksu-susfs-nomount.fragment"
+      - ".github/workflows/build-lavender.yml"
+permissions:
+  contents: read
+concurrency:
+  group: lavender-kernel-\${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    steps:
+      - name: Checkout build recipe
+        uses: actions/checkout@v4
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            bc bison flex build-essential libssl-dev libelf-dev libncurses-dev \
+            gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi binutils-aarch64-linux-gnu \
+            binutils-arm-linux-gnueabi device-tree-compiler cpio kmod lz4 rsync \
+            python3 git curl ca-certificates
+      - name: Compile SouthWest-NG kernel
+        shell: bash
+        run: |
+          chmod +x scripts/build_lavender.sh
+          scripts/build_lavender.sh
+      - name: Upload kernel and build evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: lavender-southwest-ng-ksu-susfs-nomount
+          path: |
+            dist/Image-dtb
+            dist/kernel.config
+            dist/config-summary.txt
+            dist/SHA256SUMS
+            dist/build-manifest.txt
+            logs/build.log
+          if-no-files-found: error
+          retention-days: 14
