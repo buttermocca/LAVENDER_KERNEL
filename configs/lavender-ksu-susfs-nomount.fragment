@@ -1,5 +1,6 @@
 # Redmi Note 7 lavender / SouthWest-NG 0.23.0
 # KernelSU Next legacy manual-hook + SUSFS v2.3.0 NON-GKI + NoMount
+CONFIG_LOCALVERSION="-SouthWest-NG-0.23.0-KSU-SUSFS-NOMOUNT"
 CONFIG_KSU=y
 CONFIG_KSU_MANUAL_HOOK=y
 # CONFIG_KSU_SYSCALL_TABLE_HOOK is not set
